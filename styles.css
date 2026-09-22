@@ -279,7 +279,7 @@ canvas {
 
 .segmented {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   padding: 5px;
   margin-bottom: 14px;
@@ -483,6 +483,11 @@ tr:last-child td {
   color: var(--amber);
 }
 
+.badge.unleaded {
+  background: #e8f7ee;
+  color: var(--green);
+}
+
 .fuel-dot {
   width: 14px;
   height: 14px;
@@ -495,6 +500,10 @@ tr:last-child td {
 
 .fuel-dot.diesel {
   background: var(--amber);
+}
+
+.fuel-dot.unleaded {
+  background: var(--green);
 }
 
 .setup-actions {

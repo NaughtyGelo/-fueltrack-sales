@@ -1,10 +1,16 @@
 const STORE_KEY = "fueltrack.sales.v2";
+const FUELS = [
+  { name: "Premium", key: "premium", color: "#2563eb" },
+  { name: "Unleaded", key: "unleaded", color: "#15803d" },
+  { name: "Diesel", key: "diesel", color: "#b7791f" }
+];
 
 const defaultState = {
   nextId: 1,
   filter: "all",
   setup: {
     Premium: { price: 65.5, cost: 58, capacity: 10000, stock: 10000 },
+    Unleaded: { price: 63, cost: 56, capacity: 10000, stock: 10000 },
     Diesel: { price: 62, cost: 55, capacity: 10000, stock: 10000 }
   },
   sales: []
@@ -31,15 +37,19 @@ function loadState() {
     return {
       ...structuredClone(defaultState),
       ...parsed,
-      setup: {
-        Premium: { ...defaultState.setup.Premium, ...(parsed.setup?.Premium || {}) },
-        Diesel: { ...defaultState.setup.Diesel, ...(parsed.setup?.Diesel || {}) }
-      },
+      setup: fuelSetup(parsed.setup),
       sales: Array.isArray(parsed.sales) ? parsed.sales : []
     };
   } catch {
     return structuredClone(defaultState);
   }
+}
+
+function fuelSetup(savedSetup = {}) {
+  return FUELS.reduce((setup, fuel) => {
+    setup[fuel.name] = { ...defaultState.setup[fuel.name], ...(savedSetup?.[fuel.name] || {}) };
+    return setup;
+  }, {});
 }
 
 function saveState() {
@@ -65,6 +75,7 @@ function totals() {
     acc.cost += sale.liters * sale.costPerLiter;
     acc.profit += profit;
     acc.liters += sale.liters;
+    if (!acc.byFuel[sale.fuel]) acc.byFuel[sale.fuel] = { revenue: 0, profit: 0, liters: 0 };
     acc.byFuel[sale.fuel].revenue += sale.amount;
     acc.byFuel[sale.fuel].profit += profit;
     acc.byFuel[sale.fuel].liters += sale.liters;
@@ -74,10 +85,10 @@ function totals() {
     cost: 0,
     profit: 0,
     liters: 0,
-    byFuel: {
-      Premium: { revenue: 0, profit: 0, liters: 0 },
-      Diesel: { revenue: 0, profit: 0, liters: 0 }
-    }
+    byFuel: FUELS.reduce((byFuel, fuel) => {
+      byFuel[fuel.name] = { revenue: 0, profit: 0, liters: 0 };
+      return byFuel;
+    }, {})
   });
 }
 
@@ -132,14 +143,14 @@ function metric(label, value, sub, primary = false) {
 function renderTanks(targetId) {
   const target = document.getElementById(targetId);
   if (!target) return;
-  target.innerHTML = ["Premium", "Diesel"].map((fuel) => {
-    const item = state.setup[fuel];
+  target.innerHTML = FUELS.map((fuel) => {
+    const item = state.setup[fuel.name];
     const percent = item.capacity > 0 ? Math.max(0, Math.min(100, (item.stock / item.capacity) * 100)) : 0;
     const color = percent <= 10 ? "var(--red)" : percent <= 25 ? "var(--amber)" : "var(--green)";
     return `
       <article class="tank-item">
         <div class="tank-top">
-          <span>${fuel}</span>
+          <span>${fuel.name}</span>
           <span>${percent.toFixed(1)}%</span>
         </div>
         <div class="tank-track"><div class="tank-fill" style="width:${percent}%;background:${color}"></div></div>
@@ -200,6 +211,10 @@ function fillSetupForm() {
     premiumCost: state.setup.Premium.cost,
     premiumCapacity: state.setup.Premium.capacity,
     premiumStock: state.setup.Premium.stock,
+    unleadedPrice: state.setup.Unleaded.price,
+    unleadedCost: state.setup.Unleaded.cost,
+    unleadedCapacity: state.setup.Unleaded.capacity,
+    unleadedStock: state.setup.Unleaded.stock,
     dieselPrice: state.setup.Diesel.price,
     dieselCost: state.setup.Diesel.cost,
     dieselCapacity: state.setup.Diesel.capacity,
@@ -270,6 +285,12 @@ function saveSetup(event) {
       capacity: valueOf("premiumCapacity") || 10000,
       stock: valueOf("premiumStock")
     },
+    Unleaded: {
+      price: valueOf("unleadedPrice"),
+      cost: valueOf("unleadedCost"),
+      capacity: valueOf("unleadedCapacity") || 10000,
+      stock: valueOf("unleadedStock")
+    },
     Diesel: {
       price: valueOf("dieselPrice"),
       cost: valueOf("dieselCost"),
@@ -277,8 +298,9 @@ function saveSetup(event) {
       stock: valueOf("dieselStock")
     }
   };
-  state.setup.Premium.stock = Math.min(state.setup.Premium.stock, state.setup.Premium.capacity);
-  state.setup.Diesel.stock = Math.min(state.setup.Diesel.stock, state.setup.Diesel.capacity);
+  FUELS.forEach((fuel) => {
+    state.setup[fuel.name].stock = Math.min(state.setup[fuel.name].stock, state.setup[fuel.name].capacity);
+  });
   saveState();
   showNotice("setupNotice", "Setup saved.");
   setFuelDefaults();
@@ -346,10 +368,11 @@ function drawMixChart() {
   if (!canvas) return;
   const ctx = canvas.getContext("2d");
   const data = totals().byFuel;
-  drawBars(ctx, canvas, [
-    { label: "Premium", value: data.Premium.revenue, color: "#2563eb" },
-    { label: "Diesel", value: data.Diesel.revenue, color: "#b7791f" }
-  ]);
+  drawBars(ctx, canvas, FUELS.map((fuel) => ({
+    label: fuel.name,
+    value: data[fuel.name].revenue,
+    color: fuel.color
+  })));
 }
 
 function drawTrendChart() {
@@ -378,9 +401,11 @@ function drawBars(ctx, canvas, bars) {
     return;
   }
   const max = Math.max(...bars.map((bar) => bar.value), 1);
-  const barWidth = 120;
+  const barWidth = 96;
+  const gap = 150;
+  const startX = Math.max(36, (width - (bars.length - 1) * gap - barWidth) / 2);
   bars.forEach((bar, index) => {
-    const x = 100 + index * 190;
+    const x = startX + index * gap;
     const barHeight = Math.max(8, (bar.value / max) * 150);
     const y = 210 - barHeight;
     ctx.fillStyle = bar.color;

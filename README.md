@@ -1,6 +1,6 @@
 # FuelTrack Sales
 
-A deployable static gas station sales system for recording Premium and Diesel sales, tracking inventory, calculating profit, and exporting CSV reports.
+A deployable static gas station sales system for recording Premium, Unleaded, and Diesel sales, tracking inventory, calculating profit, and exporting CSV reports.
 
 ## Features
 

@@ -53,7 +53,7 @@
             <section class="panel">
               <div class="panel-head">
                 <h3>Revenue mix</h3>
-                <span class="muted">Premium vs Diesel</span>
+                <span class="muted">By fuel type</span>
               </div>
               <canvas id="mixChart" width="520" height="280" aria-label="Revenue mix chart"></canvas>
             </section>
@@ -90,6 +90,10 @@
                 <label>
                   <input type="radio" name="fuelType" value="Premium" checked>
                   <span>Premium</span>
+                </label>
+                <label>
+                  <input type="radio" name="fuelType" value="Unleaded">
+                  <span>Unleaded</span>
                 </label>
                 <label>
                   <input type="radio" name="fuelType" value="Diesel">
@@ -142,6 +146,7 @@
           <div class="filter-row" id="historyFilters">
             <button class="filter active" data-filter="all" type="button">All</button>
             <button class="filter" data-filter="Premium" type="button">Premium</button>
+            <button class="filter" data-filter="Unleaded" type="button">Unleaded</button>
             <button class="filter" data-filter="Diesel" type="button">Diesel</button>
           </div>
 
@@ -184,6 +189,19 @@
                 <label class="field"><span>Cost per liter</span><input id="premiumCost" type="number" min="0" step="0.01"></label>
                 <label class="field"><span>Tank capacity</span><input id="premiumCapacity" type="number" min="0" step="0.01"></label>
                 <label class="field"><span>Current stock</span><input id="premiumStock" type="number" min="0" step="0.01"></label>
+              </div>
+            </section>
+
+            <section class="panel fuel-setup">
+              <div class="panel-head">
+                <h3>Unleaded</h3>
+                <span class="fuel-dot unleaded"></span>
+              </div>
+              <div class="field-grid single">
+                <label class="field"><span>Price per liter</span><input id="unleadedPrice" type="number" min="0" step="0.01"></label>
+                <label class="field"><span>Cost per liter</span><input id="unleadedCost" type="number" min="0" step="0.01"></label>
+                <label class="field"><span>Tank capacity</span><input id="unleadedCapacity" type="number" min="0" step="0.01"></label>
+                <label class="field"><span>Current stock</span><input id="unleadedStock" type="number" min="0" step="0.01"></label>
               </div>
             </section>
 
