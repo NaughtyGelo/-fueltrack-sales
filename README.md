@@ -10,6 +10,7 @@ A deployable static gas station sales system for recording Premium, Unleaded, an
 - Sales history filters and delete correction
 - CSV export for reporting
 - PWA manifest and service worker for home-screen install support
+- Optional Supabase sync so phone, iPad, and desktop can share one sales database
 
 ## Deploy With GitHub Pages
 
@@ -21,6 +22,15 @@ A deployable static gas station sales system for recording Premium, Unleaded, an
 
 Your app will be available at `https://YOUR-USERNAME.github.io/YOUR-REPO/`.
 
-## Data Note
+## Shared Sync
 
-This version stores data in the browser using `localStorage`. Your phone and iPad will each have their own data unless we add a shared backend such as Firebase or Supabase.
+By default, this app stores data in the browser using `localStorage`. To sync across devices:
+
+1. Create a Supabase project.
+2. Open the Supabase SQL Editor.
+3. In `supabase-schema.sql`, replace `CHANGE-THIS-SYNC-CODE` with your private sync code.
+4. Run the SQL in Supabase.
+5. In `config.js`, set `enabled: true`, then add your Supabase Project URL and anon public key.
+6. Commit and push the updated files to GitHub.
+
+On first load, each device will ask for the sync code. Use the same code on your phone, iPad, and computer.

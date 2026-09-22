@@ -1,4 +1,6 @@
 const STORE_KEY = "fueltrack.sales.v2";
+const SYNC_SECRET_KEY = "fueltrack.syncSecret.v1";
+const CLOUD_CONFIG = window.FUELTRACK_CLOUD || {};
 const FUELS = [
   { name: "Premium", key: "premium", color: "#2563eb" },
   { name: "Unleaded", key: "unleaded", color: "#15803d" },
@@ -17,6 +19,11 @@ const defaultState = {
 };
 
 let state = loadState();
+let cloudState = {
+  enabled: Boolean(CLOUD_CONFIG.enabled && CLOUD_CONFIG.supabaseUrl && CLOUD_CONFIG.anonKey && CLOUD_CONFIG.stationId),
+  syncing: false,
+  online: false
+};
 
 const currency = new Intl.NumberFormat("en-PH", {
   style: "currency",
@@ -34,15 +41,19 @@ function loadState() {
     const raw = localStorage.getItem(STORE_KEY);
     if (!raw) return structuredClone(defaultState);
     const parsed = JSON.parse(raw);
-    return {
-      ...structuredClone(defaultState),
-      ...parsed,
-      setup: fuelSetup(parsed.setup),
-      sales: Array.isArray(parsed.sales) ? parsed.sales : []
-    };
+    return normalizeState(parsed);
   } catch {
     return structuredClone(defaultState);
   }
+}
+
+function normalizeState(input = {}) {
+  return {
+    ...structuredClone(defaultState),
+    ...input,
+    setup: fuelSetup(input.setup),
+    sales: Array.isArray(input.sales) ? input.sales : []
+  };
 }
 
 function fuelSetup(savedSetup = {}) {
@@ -54,6 +65,141 @@ function fuelSetup(savedSetup = {}) {
 
 function saveState() {
   localStorage.setItem(STORE_KEY, JSON.stringify(state));
+}
+
+function publicState() {
+  return {
+    nextId: state.nextId,
+    filter: state.filter,
+    setup: state.setup,
+    sales: state.sales
+  };
+}
+
+function syncSecret() {
+  if (!cloudState.enabled) return "";
+  let secret = localStorage.getItem(SYNC_SECRET_KEY);
+  if (secret) return secret;
+  secret = prompt("Enter your FuelTrack sync code for this station:");
+  if (!secret) return "";
+  localStorage.setItem(SYNC_SECRET_KEY, secret);
+  return secret;
+}
+
+function setSyncStatus(message, kind = "") {
+  const chip = document.getElementById("syncStatus");
+  if (!chip) return;
+  chip.textContent = message;
+  chip.className = `sync-chip ${kind}`.trim();
+}
+
+function updateDataModeText() {
+  const text = document.getElementById("dataModeText");
+  if (!text) return;
+  text.textContent = cloudState.enabled
+    ? "Cloud sync is enabled. This device keeps a local copy and syncs to your shared station database."
+    : "Stored privately in this browser. Export CSV for backup or reporting.";
+}
+
+async function supabaseRpc(functionName, payload) {
+  const baseUrl = CLOUD_CONFIG.supabaseUrl.replace(/\/$/, "");
+  const response = await fetch(`${baseUrl}/rest/v1/rpc/${functionName}`, {
+    method: "POST",
+    headers: {
+      "apikey": CLOUD_CONFIG.anonKey,
+      "authorization": `Bearer ${CLOUD_CONFIG.anonKey}`,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    throw new Error(`Supabase ${functionName} failed with ${response.status}`);
+  }
+
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
+}
+
+async function pullCloudState() {
+  if (!cloudState.enabled) {
+    setSyncStatus("Local mode");
+    updateDataModeText();
+    return;
+  }
+
+  const secret = syncSecret();
+  if (!secret) {
+    setSyncStatus("Sync code needed", "error");
+    updateDataModeText();
+    return;
+  }
+
+  try {
+    cloudState.syncing = true;
+    setSyncStatus("Syncing...", "syncing");
+    const remote = await supabaseRpc("fueltrack_get_state", {
+      p_station_id: CLOUD_CONFIG.stationId,
+      p_sync_secret: secret
+    });
+
+    if (!remote) {
+      cloudState.online = false;
+      setSyncStatus("Sync denied", "error");
+      return;
+    }
+
+    state = normalizeState(remote);
+    saveState();
+    cloudState.online = true;
+    setSyncStatus("Cloud synced", "online");
+    updateDataModeText();
+    render();
+  } catch {
+    cloudState.online = false;
+    setSyncStatus("Cloud offline", "error");
+    updateDataModeText();
+  } finally {
+    cloudState.syncing = false;
+  }
+}
+
+async function pushCloudState() {
+  saveState();
+  if (!cloudState.enabled) {
+    setSyncStatus("Local mode");
+    return;
+  }
+
+  const secret = syncSecret();
+  if (!secret) {
+    setSyncStatus("Sync code needed", "error");
+    return;
+  }
+
+  try {
+    cloudState.syncing = true;
+    setSyncStatus("Saving...", "syncing");
+    const saved = await supabaseRpc("fueltrack_save_state", {
+      p_station_id: CLOUD_CONFIG.stationId,
+      p_sync_secret: secret,
+      p_data: publicState()
+    });
+
+    if (!saved) {
+      cloudState.online = false;
+      setSyncStatus("Sync denied", "error");
+      return;
+    }
+
+    cloudState.online = true;
+    setSyncStatus("Cloud synced", "online");
+  } catch {
+    cloudState.online = false;
+    setSyncStatus("Saved locally", "error");
+  } finally {
+    cloudState.syncing = false;
+  }
 }
 
 function php(value) {
@@ -112,6 +258,7 @@ function render() {
   renderMetrics();
   renderTanks("dashboardTanks");
   renderTanks("saleTanks");
+  renderFilterButtons();
   renderHistory();
   renderSalePreview();
   drawMixChart();
@@ -205,6 +352,12 @@ function renderHistory() {
   }).join("");
 }
 
+function renderFilterButtons() {
+  document.querySelectorAll(".filter").forEach((item) => {
+    item.classList.toggle("active", item.dataset.filter === state.filter);
+  });
+}
+
 function fillSetupForm() {
   const map = {
     premiumPrice: state.setup.Premium.price,
@@ -270,7 +423,7 @@ function recordSale(event) {
     timestamp: new Date().toISOString()
   });
   setup.stock = Math.max(0, setup.stock - qty);
-  saveState();
+  pushCloudState();
   document.getElementById("saleAmount").value = "";
   showNotice("saleNotice", `${fuel} sale recorded: ${liters(qty)} for ${php(amount)}.`, setup.stock <= setup.capacity * 0.1 ? "warning" : "success");
   render();
@@ -301,7 +454,7 @@ function saveSetup(event) {
   FUELS.forEach((fuel) => {
     state.setup[fuel.name].stock = Math.min(state.setup[fuel.name].stock, state.setup[fuel.name].capacity);
   });
-  saveState();
+  pushCloudState();
   showNotice("setupNotice", "Setup saved.");
   setFuelDefaults();
   render();
@@ -316,7 +469,7 @@ function deleteSale(id) {
   if (!sale) return;
   state.setup[sale.fuel].stock = Math.min(state.setup[sale.fuel].capacity, state.setup[sale.fuel].stock + sale.liters);
   state.sales = state.sales.filter((item) => item.id !== id);
-  saveState();
+  pushCloudState();
   render();
 }
 
@@ -325,7 +478,7 @@ function clearAllSales() {
   if (!confirm("Clear all sales records? This cannot be undone.")) return;
   state.sales = [];
   state.nextId = 1;
-  saveState();
+  pushCloudState();
   render();
 }
 
@@ -536,6 +689,15 @@ if ("serviceWorker" in navigator) {
   });
 }
 
+document.getElementById("syncStatus").addEventListener("click", () => {
+  if (!cloudState.enabled) {
+    alert("Cloud sync is not configured yet. Add Supabase settings in config.js first.");
+    return;
+  }
+  pullCloudState();
+});
+
 setFuelDefaults();
 fillSetupForm();
 render();
+pullCloudState();

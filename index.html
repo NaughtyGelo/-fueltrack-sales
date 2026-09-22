@@ -15,7 +15,10 @@
           <p class="eyebrow">Station sales system</p>
           <h1>FuelTrack</h1>
         </div>
-        <div class="date-chip" id="todayLabel"></div>
+        <div class="header-status">
+          <div class="date-chip" id="todayLabel"></div>
+          <button class="sync-chip" id="syncStatus" type="button">Local mode</button>
+        </div>
       </header>
 
       <nav class="nav-tabs" aria-label="Main navigation">
@@ -221,7 +224,7 @@
             <section class="panel setup-actions">
               <div>
                 <h3>Data</h3>
-                <p class="muted">Stored privately in this browser. Export CSV for backup or reporting.</p>
+                <p class="muted" id="dataModeText">Stored privately in this browser. Export CSV for backup or reporting.</p>
               </div>
               <div class="action-row">
                 <button class="primary-btn" type="submit">Save setup</button>
@@ -234,6 +237,7 @@
       </main>
     </div>
 
+    <script src="config.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

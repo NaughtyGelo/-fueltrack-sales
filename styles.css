@@ -60,6 +60,12 @@ button {
   padding: 10px 2px 18px;
 }
 
+.header-status {
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+}
+
 .eyebrow {
   margin: 0 0 4px;
   color: var(--muted);
@@ -97,6 +103,36 @@ h3 {
   color: var(--muted);
   font-size: 0.86rem;
   box-shadow: var(--shadow);
+}
+
+.sync-chip {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--muted);
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  box-shadow: var(--shadow);
+}
+
+.sync-chip.online {
+  border-color: #a7dfbe;
+  background: #e8f7ee;
+  color: var(--green);
+}
+
+.sync-chip.syncing {
+  border-color: #f2d293;
+  background: #fff4d8;
+  color: var(--amber);
+}
+
+.sync-chip.error {
+  border-color: #f2b5ad;
+  background: #fff5f4;
+  color: var(--red);
 }
 
 .nav-tabs {
@@ -553,6 +589,10 @@ tr:last-child td {
 
   .date-chip {
     display: none;
+  }
+
+  .header-status {
+    justify-items: start;
   }
 
   .metrics,
